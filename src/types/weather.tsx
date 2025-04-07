@@ -28,6 +28,7 @@ export interface CurrentWeather {
     dt: number;
     aqi: number;
     weather: WeatherCondition;
+    uv_index: number
 }
 
 export interface HourlyForecast {
@@ -42,6 +43,7 @@ export interface HourlyForecast {
     dew_point: number;
     pop: number;
     weather: WeatherCondition;
+    uv_index: number
 }
 
 export interface DailyForecast {
@@ -58,6 +60,8 @@ export interface DailyForecast {
     moon_phase: string;
     summary: string;
     weather: WeatherCondition;
+    uv_index: number
+
 }
 
 export interface WeatherAlert {

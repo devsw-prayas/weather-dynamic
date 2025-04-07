@@ -2,6 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WeatherData } from '../types/weather';
 import { WeatherIcon } from './WeatherIcon';
+import {getLocationGradient} from "../utils/functional.tsx";
 
 const backdropVariants = {
     hidden: { opacity: 0 },
@@ -41,7 +42,8 @@ const BaseOverlay: React.FC<{
     children: React.ReactNode;
     isOpen: boolean;
     onClose: () => void;
-}> = ({ title, children, isOpen, onClose }) => {
+    weather : WeatherData
+}> = ({ title, children, isOpen, onClose, weather }) => {
     React.useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
@@ -80,12 +82,14 @@ const BaseOverlay: React.FC<{
                     >
                         {/* Header */}
                         <div className="flex-shrink-0 flex justify-between items-center p-6 border-b border-white/20">
-                            <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
+                            <h2 className={`text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r
+                            ${getLocationGradient(weather.current.weather.condition)}`}>
                                 {title}
                             </h2>
                             <button
                                 onClick={onClose}
-                                className="text-3xl w-10 h-10 flex items-center justify-center hover:text-cyan-400 transition-colors rounded-full hover:bg-white/10"
+                                className="text-3xl w-10 h-10 flex items-center justify-center hover:text-cyan-400
+                                transition-colors rounded-full hover:bg-white/10"
                                 aria-label="Close"
                             >
                                 &times;
@@ -108,7 +112,7 @@ export const HourlyOverlay: React.FC<{
     isOpen: boolean;
     onClose: () => void;
 }> = ({ weatherData, isOpen, onClose }) => (
-    <BaseOverlay title="Hourly Forecast" isOpen={isOpen} onClose={onClose}>
+    <BaseOverlay title="Hourly Forecast" isOpen={isOpen} onClose={onClose} weather={weatherData}>
         <div className="flex overflow-x-auto gap-4 pb-2">
             {weatherData.hourly.slice(0, 24).map((hour, i) => (
                 <motion.div
@@ -150,7 +154,7 @@ export const DailyOverlay: React.FC<{
     isOpen: boolean;
     onClose: () => void;
 }> = ({ weatherData, isOpen, onClose }) => (
-    <BaseOverlay title="7-Day Forecast" isOpen={isOpen} onClose={onClose}>
+    <BaseOverlay title="7-Day Forecast" isOpen={isOpen} onClose={onClose} weather={weatherData}>
         <div className="space-y-3">
             {weatherData.daily.map((day, i) => (
                 <motion.div

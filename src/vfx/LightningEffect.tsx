@@ -1,3 +1,4 @@
+
 import { motion, useAnimation } from "framer-motion";
 import { useEffect } from "react";
 
@@ -14,13 +15,13 @@ const LightningFlash = () => {
                 opacity: [0, 1, 0],
                 transition: {
                     duration: 0.5,
-                    times: [0, 0.1, 1],
+                    times: [0, 0.4, 1],
                     ease: "easeInOut",
                 },
             });
 
             // Random delay between 100ms and 1000ms (0.1s - 1s)
-            const delay = Math.random() * 900 + 100;
+            const delay = Math.random() * 4000 + 3000;
             timeoutId = window.setTimeout(flash, delay);
         };
 

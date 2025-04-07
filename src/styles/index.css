@@ -19,15 +19,35 @@
           inset 0 6px 12px rgba(255, 255, 255, 0.15);
 }
 
+/* Dark Glass Morphism */
+.dark-glass {
+  background: rgba(0, 0, 0, 0.3); /* Darker base */
+  backdrop-filter: blur(20px) saturate(180%) brightness(0.8); /* Added brightness filter */
+  -webkit-backdrop-filter: blur(20px) saturate(180%) brightness(0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1); /* More subtle border */
+  box-shadow:
+          0 8px 32px rgba(0, 0, 0, 0.3), /* Darker shadows */
+          inset 0 4px 8px rgba(255, 255, 255, 0.05); /* More subtle inner glow */
+  transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.dark-glass:hover {
+  transform: translateY(-2px);
+  background: rgba(0, 0, 0, 0.35); /* Slightly darker on hover */
+  box-shadow:
+          0 12px 40px rgba(0, 0, 0, 0.4),
+          inset 0 6px 12px rgba(255, 255, 255, 0.08);
+}
+
 .weather-bg {
   animation: gradientMove 30s ease infinite;
   background-size: 200% 200%;
 }
 
 @keyframes gradientMove {
-  0% { background-position: 0% 50%; }
+  0% { background-position: 0 50%; }
   50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  100% { background-position: 0 50%; }
 }
 
 /* Clear Sky */
@@ -66,6 +86,97 @@
   #e879f9 100%);
 }
 
+/* Snowy */
+.weather-bg-snowy {
+  background: linear-gradient(135deg,
+  #f8fafc 0%,
+  #e0f2fe 40%,
+  #bae6fd 70%,
+  #7dd3fc 100%);
+}
+
+/* Foggy */
+.weather-bg-foggy {
+  background: linear-gradient(135deg,
+  #334155 0%,
+  #64748b 40%,
+  #94a3b8 70%,
+  #cbd5e1 100%);
+}
+
+/* Partly Cloudy */
+.weather-bg-partly-cloudy {
+  background: linear-gradient(135deg,
+  #0f172a 0%,
+  #0284c7 30%,
+  #94a3b8 70%,
+  #f1f5f9 100%);
+}
+
+/* Night: Clear */
+.weather-bg-clear-night {
+  background: linear-gradient(135deg,
+  #020617 0%,
+  #0f172a 40%,
+  #1e3a8a 70%,
+  #3b82f6 100%);
+}
+
+/* Night: Cloudy */
+.weather-bg-cloudy-night {
+  background: linear-gradient(135deg,
+  #0f172a 0%,
+  #1e293b 40%,
+  #334155 70%,
+  #64748b 100%);
+}
+
+/* Night: Rainy */
+.weather-bg-rainy-night {
+  background: linear-gradient(135deg,
+  #0c0a09 0%,
+  #1e1b4b 40%,
+  #334155 70%,
+  #64748b 100%);
+}
+
+/* Night: Thunderstorm */
+.weather-bg-thunderstorm-night {
+  background: linear-gradient(135deg,
+  #0f172a 0%,
+  #312e81 40%,
+  #6b21a8 70%,
+  #a855f7 100%);
+}
+
+/* Night: Snowy */
+.weather-bg-snowy-night {
+  background: linear-gradient(135deg,
+  #f1f5f9 0%,
+  #cbd5e1 40%,
+  #94a3b8 70%,
+  #64748b 100%);
+}
+
+/* Night: Foggy */
+.weather-bg-foggy-night {
+  background: linear-gradient(135deg,
+  #1e293b 0%,
+  #334155 40%,
+  #64748b 70%,
+  #94a3b8 100%);
+}
+
+/* Night: Partly Cloudy */
+.weather-bg-partly-cloudy-night {
+  background: linear-gradient(135deg,
+  #0f172a 0%,
+  #1e293b 40%,
+  #334155 70%,
+  #64748b 100%);
+}
+
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -82,6 +193,14 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.5);
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Custom Slider */
