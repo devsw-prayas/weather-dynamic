@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import Landing from './components/Landing';
 import { WeatherData } from './types/weather';
+import {fetchWeatherData} from "./backend/weatherBackend.tsx";
+import {AnimatePresence, motion} from "framer-motion";
 
 const baseWeatherData: WeatherData = {
     location: {
@@ -83,175 +85,496 @@ const baseWeatherData: WeatherData = {
 };
 
 const App: React.FC = () => {
+    const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+    const [isTestMode, setIsTestMode] = useState(false);
+    const [isTestPanelOpen, setIsTestPanelOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [coords, setCoords] = useState({ lat: 40.7128, lon: -74.0060 });
+    const [isLocationPanelOpen, setIsLocationPanelOpen] = useState(false);
+    const [tempLocation, setTempLocation] = useState(coords);
     const [minuteOffset, setMinuteOffset] = useState(0);
     const [weatherCondition, setWeatherCondition] = useState<WeatherData["current"]["weather"]["condition"]>("clear");
-    const [isTestPanelOpen, setIsTestPanelOpen] = useState(false);
     const [isAutoMode, setIsAutoMode] = useState(false);
 
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+
     const conditions: WeatherData["current"]["weather"]["condition"][] = [
-        "thunderstorm",
-        "clear",
-        "cloudy",
-        "rainy",
-        "snowy",
-        "foggy",
-        "partly-cloudy",
+        "thunderstorm", "clear", "cloudy", "rainy", "snowy", "foggy", "partly-cloudy"
     ];
 
-    useEffect(() => {
-        if (!isAutoMode || !isTestPanelOpen) return;
+    const searchLocations = async (query: string) => {
+        if (query.length < 3) {
+            setSearchResults([]);
+            return;
+        }
 
-        let intervalId: number;
-        let conditionIndex = 0;
-        let timeProgress = -720;
-
-        const runAutoLoop = () => {
-            intervalId = window.setInterval(() => {
-                setMinuteOffset(Math.round(timeProgress));
-                timeProgress += 10;
-                if (timeProgress > 720) {
-                    timeProgress = -720;
-                    conditionIndex = (conditionIndex + 1) % conditions.length;
-                    setWeatherCondition(conditions[conditionIndex]);
+        setIsSearching(true);
+        try {
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=5`,
+                {
+                    headers: {
+                        'User-Agent': 'YourWeatherApp/1.0 (your@email.com)' // Required
+                    }
                 }
-            }, 100);
-        };
+            );
+            const data = await response.json();
+            setSearchResults(data);
+        } catch (error) {
+            console.error('Search error:', error);
+        } finally {
+            setIsSearching(false);
+        }
+    };
 
-        runAutoLoop();
-        return () => clearInterval(intervalId);
-    }, [isAutoMode, isTestPanelOpen]);
+    const fetchRealData = useCallback(async (lat: number, lon: number) => {
+        setIsLoading(true);
+        try {
+            const data = await fetchWeatherData(lat, lon);
+            setWeatherData({
+                ...data,
+                location: {
+                    ...data.location,
+                    lat, // Force the new lat
+                    lon, // Force the new lon
+                    city: searchQuery || data.location.city, // Use search query if available
+                },
+            });
+            setError(null);
+            return data;
+        } catch (err) {
+            setError('Failed to fetch weather data. Guess the clouds are on vacation.');
+            setIsTestMode(true); // Fallback to test mode, because why not?
+            throw err;
+        } finally {
+            setIsLoading(false);
+        }
+    }, [searchQuery]); // Dependency on searchQuery for city name
 
-    useEffect(() => {
-        const handleKeyPress = (e: KeyboardEvent) => {
-            if (e.key === 'Tab') {
-                e.preventDefault();
-                setIsTestPanelOpen((prev) => !prev);
-                if (isAutoMode) setIsAutoMode(false);
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyPress);
-        return () => window.removeEventListener('keydown', handleKeyPress);
-    }, [isAutoMode]);
-
-    const offsetSeconds = minuteOffset * 60;
-
-    const dynamicWeatherData: WeatherData = {
-        ...baseWeatherData,
-        current: {
-            ...baseWeatherData.current,
-            dt: baseWeatherData.current.dt + offsetSeconds,
-            temp: 48 + Math.round(((minuteOffset / 60) < 14 ? (minuteOffset / 60) : 24 - (minuteOffset / 60)) * 1.2),
-            uv_index: Math.min(4.5, Math.max(0, 4.5 * Math.sin(((minuteOffset / 60) - 6) * Math.PI / 12))),
-            precip: (minuteOffset / 60) >= 14 && (minuteOffset / 60) <= 17 ? 0.05 : 0,
-            weather: {
-                ...baseWeatherData.current.weather,
-                condition: weatherCondition,
-                main: weatherCondition === "thunderstorm" ? "Thunderstorm" : weatherCondition.charAt(0).toUpperCase() + weatherCondition.slice(1),
-                description: `${weatherCondition.charAt(0).toUpperCase() + weatherCondition.slice(1)} with a side of sass`,
-                icon: {
-                    thunderstorm: minuteOffset < 387 || minuteOffset > 1171 ? "11n" : "11d",
-                    clear: minuteOffset < 387 || minuteOffset > 1171 ? "01n" : "01d",
-                    cloudy: minuteOffset < 387 || minuteOffset > 1171 ? "03n" : "03d",
-                    rainy: minuteOffset < 387 || minuteOffset > 1171 ? "10n" : "10d",
-                    snowy: minuteOffset < 387 || minuteOffset > 1171 ? "13n" : "13d",
-                    foggy: minuteOffset < 387 || minuteOffset > 1171 ? "50n" : "50d",
-                    "partly-cloudy": minuteOffset < 387 || minuteOffset > 1171 ? "02n" : "02d",
-                }[weatherCondition],
+    // Generate test weather data
+    const generateTestData = useCallback(() => {
+        const offsetSeconds = minuteOffset * 60;
+        return {
+            ...baseWeatherData,
+            location: {
+                ...baseWeatherData.location,
+                lat: coords.lat,
+                lon: coords.lon
             },
-        },
-        hourly: baseWeatherData.hourly.map((hour) => {
-            const hourOffset = hour.dt + offsetSeconds;
-            return {
+            current: {
+                ...baseWeatherData.current,
+                dt: baseWeatherData.current.dt + offsetSeconds,
+                weather: {
+                    ...baseWeatherData.current.weather,
+                    condition: weatherCondition,
+                    icon: getWeatherIcon(
+                        weatherCondition,
+                        baseWeatherData.current.dt + offsetSeconds,
+                        baseWeatherData.current.sunrise,
+                        baseWeatherData.current.sunset
+                    )
+                }
+            },
+            hourly: baseWeatherData.hourly.map(hour => ({
                 ...hour,
-                dt: hourOffset,
+                dt: hour.dt + offsetSeconds,
                 weather: {
                     ...hour.weather,
                     condition: weatherCondition,
-                    main: weatherCondition === "thunderstorm" ? "Thunderstorm" : weatherCondition.charAt(0).toUpperCase() + weatherCondition.slice(1),
-                    description: hourOffset < baseWeatherData.current.sunset ? `${weatherCondition} vibes` : `${weatherCondition} night`,
-                    icon: {
-                        thunderstorm: hourOffset < baseWeatherData.current.sunrise || hourOffset > baseWeatherData.current.sunset ? "11n" : "11d",
-                        clear: hourOffset < baseWeatherData.current.sunrise || hourOffset > baseWeatherData.current.sunset ? "01n" : "01d",
-                        cloudy: hourOffset < baseWeatherData.current.sunrise || hourOffset > baseWeatherData.current.sunset ? "03n" : "03d",
-                        rainy: hourOffset < baseWeatherData.current.sunrise || hourOffset > baseWeatherData.current.sunset ? "10n" : "10d",
-                        snowy: hourOffset < baseWeatherData.current.sunrise || hourOffset > baseWeatherData.current.sunset ? "13n" : "13d",
-                        foggy: hourOffset < baseWeatherData.current.sunrise || hourOffset > baseWeatherData.current.sunset ? "50n" : "50d",
-                        "partly-cloudy": hourOffset < baseWeatherData.current.sunrise || hourOffset > baseWeatherData.current.sunset ? "02n" : "02d",
-                    }[weatherCondition],
-                },
+                    icon: getWeatherIcon(
+                        weatherCondition,
+                        hour.dt + offsetSeconds,
+                        baseWeatherData.current.sunrise,
+                        baseWeatherData.current.sunset
+                    )
+                }
+            })),
+            daily: baseWeatherData.daily.map(day => ({
+                ...day,
+                dt: day.dt + offsetSeconds,
+                weather: {
+                    ...day.weather,
+                    condition: weatherCondition,
+                    icon: getWeatherIcon(
+                        weatherCondition,
+                        day.dt + offsetSeconds,
+                        day.sunrise,
+                        day.sunset
+                    )
+                }
+            }))
+        };
+    }, [minuteOffset, weatherCondition, coords.lat, coords.lon]);
+
+    const handleLocationSubmit = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const newCoords = {
+                lat: tempLocation.lat,
+                lon: tempLocation.lon,
             };
-        }),
-        daily: baseWeatherData.daily.map((day) => ({
-            ...day,
-            dt: day.dt + offsetSeconds,
-        })),
+            setCoords(newCoords);
+
+            if (!isTestMode) {
+                await fetchRealData(newCoords.lat, newCoords.lon);
+            } else {
+                const testData = generateTestData();
+                setWeatherData({
+                    ...testData,
+                    location: {
+                        ...testData.location,
+                        lat: newCoords.lat,
+                        lon: newCoords.lon,
+                        city: searchQuery || testData.location.city,
+                    },
+                    hourly: [...testData.hourly], // Fresh array
+                    daily: [...testData.daily],   // Fresh array
+                });
+            }
+
+            setSearchQuery('');
+            setSearchResults([]);
+        } catch (err) {
+            setError('Location update failed. Charts are laughing at us now.');
+            console.error(err);
+        } finally {
+            setIsLoading(false);
+            setIsLocationPanelOpen(false);
+        }
+    }, [tempLocation, isTestMode, fetchRealData, generateTestData, searchQuery]);
+
+    const getWeatherIcon = (
+        condition: WeatherData["current"]["weather"]["condition"],
+        dt: number,
+        sunrise: number,
+        sunset: number
+    ): string => {
+        const isDay = dt > sunrise && dt < sunset;
+
+        const iconMap: Record<typeof condition, { day: string; night: string }> = {
+            "thunderstorm": { day: "11d", night: "11n" },
+            "clear": { day: "01d", night: "01n" },
+            "cloudy": { day: "03d", night: "03n" },
+            "rainy": { day: "10d", night: "10n" },
+            "snowy": { day: "13d", night: "13n" },
+            "foggy": { day: "50d", night: "50n" },
+            "partly-cloudy": { day: "02d", night: "02n" }
+        };
+
+        return isDay ? iconMap[condition].day : iconMap[condition].night;
     };
 
-    const formatOffset = (minutes: number) => {
-        const hours = Math.floor(Math.abs(minutes) / 60);
-        const mins = Math.abs(minutes) % 60;
-        const sign = minutes >= 0 ? "+" : "-";
-        return `${sign}${hours}h ${mins}m`;
-    };
+    useEffect(() => {
+        if (!coords) return;
+
+        const updateData = async () => {
+            try {
+                if (isTestMode) {
+                    const testData = generateTestData();
+                    setWeatherData(prev => {
+                        const newData = {
+                            ...testData,
+                            location: {
+                                ...testData.location,
+                                lat: coords.lat,
+                                lon: coords.lon,
+                                city: searchQuery || testData.location.city,
+                            },
+                            hourly: [...testData.hourly], // Fresh array
+                            daily: [...testData.daily],   // Fresh array
+                        };
+                        console.log('Test mode updated:', newData);
+                        return newData;
+                    });
+                } else {
+                    await fetchRealData(coords.lat, coords.lon);
+                }
+            } catch (err) {
+                setError('Weather update failed. Graphs are sulking again.');
+                console.error(err);
+            }
+        };
+
+        updateData();
+    }, [coords, isTestMode, generateTestData, fetchRealData, searchQuery]);
+
+    // Update test data when parameters change
+    useEffect(() => {
+        if (isTestMode) {
+            setWeatherData(generateTestData());
+        }
+    }, [isTestMode, generateTestData, coords]);
+
+    // Auto mode effect
+    useEffect(() => {
+        if (!isAutoMode || !isTestMode) return;
+
+        const interval = setInterval(() => {
+            setMinuteOffset(prev => {
+                const newOffset = prev + 10;
+                if (newOffset > 720) {
+                    setWeatherCondition(prevCond => {
+                        const nextIndex = (conditions.indexOf(prevCond) + 1 % 7);
+                        return conditions[nextIndex];
+                    });
+                    return -720;
+                }
+                return newOffset;
+            });
+        }, 100);
+
+        return () => clearInterval(interval);
+    }, [isAutoMode, isTestMode]);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                setIsTestPanelOpen(prev => !prev); // Only toggle panel visibility
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
+    // Location panel handlers
+    const openLocationPanel = useCallback(() => {
+        setTempLocation(coords);
+        setIsLocationPanelOpen(true);
+    }, [coords]);
 
     return (
         <div className="App relative min-h-screen bg-gray-900 text-white">
-            <Landing weatherData={dynamicWeatherData} />
-            {isTestPanelOpen && (
-                <div className="fixed top-4 left-4 right-400 z-50 p-6 glass rounded-xl bg-gray-800/80 flex flex-col gap-4">
-                    <h2 className="text-lg font-bold text-yellow-400">Weather Test Party (Press Tab to Close)</h2>
-                    <div className="flex flex-col gap-4">
-                        <div>
-                            <label className="block text-sm font-bold">
-                                Time Offset: {formatOffset(minuteOffset)}
-                            </label>
-                            <input
-                                type="range"
-                                min={-720}
-                                max={720}
-                                step={1}
-                                value={minuteOffset}
-                                onChange={(e) => setMinuteOffset(parseInt(e.target.value))}
-                                disabled={isAutoMode}
-                                className="custom-slider w-full"
-                            />
-                            <p className="text-xs opacity-80">
-                                Simulated Time: {new Date((baseWeatherData.current.dt + offsetSeconds) * 1000).toLocaleTimeString('en-US', {
-                                timeZone: 'America/New_York',
-                            })}
-                            </p>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-bold">Weather Condition:</label>
-                            <select
-                                value={weatherCondition}
-                                onChange={(e) =>
-                                    setWeatherCondition(e.target.value as WeatherData["current"]["weather"]["condition"])
-                                }
-                                disabled={isAutoMode}
-                                className="w-full p-2 bg-gray-700 rounded-lg text-white"
-                            >
-                                {conditions.map((cond) => (
-                                    <option key={cond} value={cond}>
-                                        {cond.replace("-", " ")}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-bold">Auto Mode:</label>
-                            <button
-                                onClick={() => setIsAutoMode((prev) => !prev)}
-                                className={`w-full p-2 rounded-lg ${isAutoMode ? 'bg-red-500' : 'bg-green-500'} text-white font-semibold`}
-                            >
-                                {isAutoMode ? 'Stop Auto Loop' : 'Start Auto Loop'}
-                            </button>
-                            {isAutoMode && <p className="text-xs opacity-80 mt-1">Cycling conditions + time fast!</p>}
-                        </div>
-                    </div>
-                </div>
+            {/* Loading State */}
+            <AnimatePresence>
+                {isLoading && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 flex items-center justify-center bg-black/50 z-50"
+                    >
+                        <motion.div
+                            animate={{ scale: [1, 1.05, 1] }}
+                            transition={{ duration: 1.5, repeat: Infinity }}
+                            className="text-xl"
+                        >
+                            Loading weather data...
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Error State */}
+            <AnimatePresence>
+                {error && (
+                    <motion.div
+                        initial={{ y: -20, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: -20, opacity: 0 }}
+                        className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded z-50"
+                    >
+                        {error}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Main Content */}
+            {weatherData && (
+                <Landing
+                    weatherData={weatherData}
+                    onOpenLocationPanel={openLocationPanel}
+                />
             )}
+
+            {isLocationPanelOpen && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-black/50 backdrop-blur-sm"
+                >
+                    <motion.div
+                        initial={{ scale: 0.95, y: 20 }}
+                        animate={{ scale: 1, y: 0 }}
+                        className="glass rounded-xl bg-gray-800/90 w-full max-w-md p-6"
+                    >
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-lg font-bold">Search Location</h2>
+                            <button
+                                onClick={() => {
+                                    setIsLocationPanelOpen(false);
+                                    setSearchResults([]);
+                                    setSearchQuery('');
+                                }}
+                                className="text-2xl hover:text-red-500"
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        {/* Search Input */}
+                        <div className="relative mb-4">
+                            <input
+                                type="text"
+                                placeholder="Search city or address..."
+                                className="w-full glass p-3 rounded-xl bg-white/10 backdrop-blur-sm"
+                                value={searchQuery}
+                                onChange={(e) => {
+                                    setSearchQuery(e.target.value);
+                                    searchLocations(e.target.value);
+                                }}
+                            />
+                            {isSearching && (
+                                <div className="absolute right-3 top-3">
+                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Search Results */}
+                        {searchResults.length > 0 && (
+                            <div className="space-y-2 mb-4 max-h-60 overflow-y-auto">
+                                {searchResults.map((result) => (
+                                    <div
+                                        key={result.place_id}
+                                        className="glass p-3 rounded-lg hover:bg-white/10 cursor-pointer transition-colors"
+                                        onClick={() => {
+                                            const newLat = parseFloat(result.lat);
+                                            const newLon = parseFloat(result.lon);
+                                            setTempLocation({lat: newLat, lon: newLon}); // Set tempLocation correctly
+                                            setSearchQuery(result.display_name); // Update search query for city name
+                                            setSearchResults([]); // Clear results after selection
+                                        }}
+                                    >
+                                        <p className="font-medium">{result.display_name}</p>
+                                        {result.address?.city && (
+                                            <p className="text-sm opacity-80">{result.address.city}, {result.address.country}</p>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-4 pt-2">
+                            <button
+                                onClick={() => setIsLocationPanelOpen(false)}
+                                className="flex-1 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleLocationSubmit}
+                                className="flex-1 py-2 bg-green-500 hover:bg-green-600 rounded-lg transition-colors"
+                            >
+                                Confirm Location
+                            </button>
+                        </div>
+                    </motion.div>
+                </motion.div>
+            )}
+
+            {/* Test Controls Panel */}
+            <AnimatePresence>
+                {isTestPanelOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95 }}
+                            animate={{ scale: 1 }}
+                            className="glass p-6 rounded-xl bg-gray-800/90 w-full max-w-md"
+                        >
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-xl font-bold">Developer Controls</h2>
+                                <button
+                                    onClick={() => {
+                                        setIsTestPanelOpen(false);
+                                        if (isAutoMode) setIsAutoMode(false);
+                                    }}
+                                    className="text-2xl hover:text-yellow-400"
+                                >
+                                    ×
+                                </button>
+                            </div>
+
+                            <div className="space-y-6">
+                                {/* Data Mode Toggle - Moved INSIDE the panel */}
+                                <div>
+                                    <h3 className="font-semibold mb-2">Data Mode</h3>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setIsTestMode(false)}
+                                            className={`flex-1 p-2 rounded-lg ${!isTestMode ? 'bg-blue-500' : 'bg-gray-700'}`}
+                                        >
+                                            Live Data
+                                        </button>
+                                        <button
+                                            onClick={() => setIsTestMode(true)}
+                                            className={`flex-1 p-2 rounded-lg ${isTestMode ? 'bg-yellow-500' : 'bg-gray-700'}`}
+                                        >
+                                            Test Data
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Rest of your test controls... */}
+                                {isTestMode && (
+                                    <>
+                                        <div>
+                                            <h3 className="font-semibold mb-2">Time Offset</h3>
+                                            <input
+                                                type="range"
+                                                min="-720"
+                                                max="720"
+                                                value={minuteOffset}
+                                                onChange={(e) => setMinuteOffset(parseInt(e.target.value))}
+                                                className="w-full"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <h3 className="font-semibold mb-2">Weather Condition</h3>
+                                            <select
+                                                value={weatherCondition}
+                                                onChange={(e) => setWeatherCondition(e.target.value as typeof weatherCondition)}
+                                                className="w-full p-2 rounded-lg bg-gray-700"
+                                            >
+                                                {conditions.map(cond => (
+                                                    <option key={cond} value={cond}>
+                                                        {cond.replace("-", " ")}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <button
+                                                onClick={() => setIsAutoMode(!isAutoMode)}
+                                                className={`w-full p-2 rounded-lg ${isAutoMode ? 'bg-red-500' : 'bg-green-500'}`}
+                                            >
+                                                {isAutoMode ? 'Stop Auto Cycle' : 'Start Auto Cycle'}
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+
+                                <div className="text-sm opacity-80 border-t border-gray-700 pt-3">
+                                    <p>Press <kbd>Tab</kbd> to close this panel</p>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

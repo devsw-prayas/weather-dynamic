@@ -9,9 +9,10 @@ import LightningFlash from "../vfx/LightningEffect.tsx";
 
 interface LandingProps {
     weatherData: WeatherData | null;
+    onOpenLocationPanel: () => void;
 }
 
-const Landing: React.FC<LandingProps> = ({ weatherData }) => {
+const Landing: React.FC<LandingProps> = ({ weatherData, onOpenLocationPanel }) => {
 
     // Show loading screen if data is not ready
     if (!weatherData) {
@@ -42,7 +43,7 @@ const Landing: React.FC<LandingProps> = ({ weatherData }) => {
             currentTime={weatherData.current.dt}
         >
             <div className="relative z-10 flex h-full p-4 gap-4">
-                <Sidebar weatherData={weatherData} />
+                <Sidebar weatherData={weatherData}  onOpenLocationPanel={onOpenLocationPanel} />
                 <div className="flex-1 flex flex-col gap-4">
                     {weatherData.alerts.length > 0 && (
                         <motion.div

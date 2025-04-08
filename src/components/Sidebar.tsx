@@ -4,9 +4,10 @@ import {getLocationGradient, getTextColorByCondition} from '../utils/functional'
 
 interface SidebarProps {
     weatherData: WeatherData;
+    onOpenLocationPanel: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ weatherData }) => {
+const Sidebar: React.FC<SidebarProps> = ({ weatherData, onOpenLocationPanel }) => {
     const locationGradient = getLocationGradient(weatherData.current.weather.condition);
     const textColor = getTextColorByCondition(weatherData.current.weather.condition);
     return (
@@ -30,12 +31,15 @@ const Sidebar: React.FC<SidebarProps> = ({ weatherData }) => {
 
             <div className="flex flex-col gap-3">
                 <button
+                    onClick={onOpenLocationPanel}
                     className={`w-full glass p-4 rounded-xl hover:bg-white/15 transition-all text-left flex items-center gap-3
                     ${weatherData.current.weather.condition == "snowy" ? "text-black" : "text-white"} font-bold`}>
                     <span className="text-xl">📍</span>
                     <span>Current Location</span>
                 </button>
-                <button className={`w-full glass p-4 rounded-xl hover:bg-white/15 transition-all text-left flex items-center gap-3
+                <button
+                    onClick={onOpenLocationPanel}
+                    className={`w-full glass p-4 rounded-xl hover:bg-white/15 transition-all text-left flex items-center gap-3
                 ${weatherData.current.weather.condition == "snowy" ? "text-black" : "text-white"} font-bold`}>
                     <span className="text-xl">❤️</span>
                     <span>Saved Locations</span>
