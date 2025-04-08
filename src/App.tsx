@@ -274,7 +274,7 @@ const App: React.FC = () => {
             try {
                 if (isTestMode) {
                     const testData = generateTestData();
-                    setWeatherData(prev => {
+                    setWeatherData(() => {
                         const newData = {
                             ...testData,
                             location: {
